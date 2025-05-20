@@ -164,11 +164,4 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
   throw new Error('Unexpected error in retry loop');
 };
 
-// Helper function to get image description using a separate API call
-// You'll need to implement this using a vision model API of your choice
-// For example: Azure Computer Vision, Google Cloud Vision, or similar
-async function getImageDescription(imageDataUrl: string): Promise<string> {
-  // TODO: Implement image description using a vision API
-  // For now, return a basic description
-  return "A photograph showing a school asset";
-} 
+ 

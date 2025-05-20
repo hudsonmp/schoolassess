@@ -54,8 +54,7 @@ const AdminPage = () => {
   // Request camera permission on mount
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        // stream.getTracks().forEach(track => track.stop()); // Stop immediately if not needed yet
+      .then(() => {
         console.log("Camera permission granted");
       })
       .catch(err => {
@@ -94,7 +93,7 @@ const AdminPage = () => {
   }, [adminAccessKey]);
 
   const fetchScannedItemsToday = async (schoolId: string) => {
-    const {data, error} = await supabase
+    const {data} = await supabase
       .from('items')
       .select('id, name, estimated_value, quantity, image_url')
       .eq('school_id', schoolId)

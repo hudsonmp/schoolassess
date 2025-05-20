@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import {
   Building2,
   Plus,
-  PlusCircle,
   ExternalLink,
   Copy,
   Trash2,
@@ -37,12 +36,10 @@ interface Item {
 
 export default function DashboardPage() {
   const [schools, setSchools] = useState<School[]>([]);
-  const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedSchoolItems, setSelectedSchoolItems] = useState<Item[]>([]);
   const [selectedSchoolForItems, setSelectedSchoolForItems] = useState<School | null>(null);
   const [newSchoolName, setNewSchoolName] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
-  const [loading, setLoading] = useState(false);
   const [addingSchool, setAddingSchool] = useState(false);
 
   useEffect(() => {
@@ -50,12 +47,10 @@ export default function DashboardPage() {
   }, []);
 
   const fetchSchoolsAndItems = async () => {
-    setLoading(true);
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       console.error("User not authenticated", sessionError);
       toast.error("Authentication error. Please sign in again.");
-      setLoading(false);
       return;
     }
     const userId = sessionData.session.user.id;
@@ -85,23 +80,6 @@ export default function DashboardPage() {
       }));
       setSchools(schoolsWithAggregates);
     }
-
-    // Fetch all items
-    if (schoolsData && schoolsData.length > 0) {
-      const schoolIds = schoolsData.map(s => s.id);
-      const { data: allItemsData, error: allItemsError } = await supabase
-        .from('items')
-        .select('*')
-        .in('school_id', schoolIds);
-
-      if (allItemsError) {
-        console.error("Error fetching all items:", allItemsError);
-        toast.error("Failed to fetch all items: " + allItemsError.message);
-      } else {
-        setAllItems(allItemsData || []);
-      }
-    }
-    setLoading(false);
   };
 
   const handleAddSchool = async () => {
@@ -153,7 +131,6 @@ export default function DashboardPage() {
     if (!window.confirm(`Are you sure you want to delete ${schoolName} and all its associated items? This action cannot be undone.`)) {
       return;
     }
-    setLoading(true);
     const { error } = await supabase.from('schools').delete().match({ id: schoolId });
     if (error) {
       toast.error(`Failed to delete school: ${error.message}`);
@@ -161,12 +138,10 @@ export default function DashboardPage() {
       toast.success(`School ${schoolName} deleted successfully.`);
       fetchSchoolsAndItems();
     }
-    setLoading(false);
   };
 
   const fetchItemsForSchool = async (school: School) => {
     setSelectedSchoolForItems(school);
-    setLoading(true);
     const { data, error } = await supabase
       .from('items')
       .select('*')
@@ -178,24 +153,20 @@ export default function DashboardPage() {
     } else {
       setSelectedSchoolItems(data || []);
     }
-    setLoading(false);
   };
 
   const handleDeleteItem = async (itemId: string, itemName: string) => {
     if (!window.confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`)) {
       return;
     }
-    setLoading(true);
     const { error } = await supabase.from('items').delete().match({ id: itemId });
     if (error) {
       toast.error(`Failed to delete item: ${error.message}`);
     } else {
       toast.success(`Item "${itemName}" deleted successfully.`);
       setSelectedSchoolItems(prev => prev.filter(item => item.id !== itemId));
-      setAllItems(prev => prev.filter(item => item.id !== itemId));
       fetchSchoolsAndItems();
     }
-    setLoading(false);
   };
 
   return (
