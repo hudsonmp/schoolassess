@@ -23,7 +23,7 @@ export default function HomePage() {
             transition={{ duration: 0.5 }}
             className="flex items-center justify-center mb-6"
           >
-            <img src="/image copy.png" alt="SchoolAssess" className="h-16 w-auto" />
+            <img src="/school-assess-logo.png" alt="SchoolAssess" className="h-16 w-auto" />
           </motion.div>
           
           <motion.h1

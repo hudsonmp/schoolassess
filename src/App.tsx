@@ -59,7 +59,7 @@ function App() {
     >
       <div className="container flex h-14 items-center">
         <img 
-          src="/image copy.png" 
+          src="/school-assess-logo.png" 
           alt="SchoolAssess" 
           className="h-8 w-auto cursor-pointer mr-8" 
           onClick={() => navigate('/')}
