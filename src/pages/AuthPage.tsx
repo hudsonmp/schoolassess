@@ -12,25 +12,35 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      toast.error('Error signing in', {
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        toast.success('Check your email for the confirmation link!');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        toast.success('Signed in successfully!');
+      }
+    } catch (error: any) {
+      toast.error(isSignUp ? 'Error signing up' : 'Error signing in', {
         description: error.message,
       });
-    } else {
-      toast.success('Signed in successfully!');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -48,7 +58,7 @@ export default function AuthPage() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="text-2xl font-bold text-gray-900 text-center mb-2"
           >
-            Welcome Back
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -56,7 +66,10 @@ export default function AuthPage() {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-gray-500 text-center mb-8"
           >
-            Sign in to manage your school's insurance claims
+            {isSignUp 
+              ? 'Sign up to start managing school insurance claims'
+              : 'Sign in to manage your school\'s insurance claims'
+            }
           </motion.p>
 
           <motion.div
@@ -64,7 +77,7 @@ export default function AuthPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
           >
-            <form onSubmit={handleSignIn}>
+            <form onSubmit={handleAuth}>
               <Card className="border-0 shadow-lg">
                 <CardContent className="space-y-4 pt-6">
                   <div className="space-y-2">
@@ -101,8 +114,17 @@ export default function AuthPage() {
                     className="w-full bg-green-600 hover:bg-green-700 mt-6"
                     disabled={loading}
                   >
-                    {loading ? 'Signing in...' : 'Sign In'}
+                    {loading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign Up' : 'Sign In')}
                   </Button>
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsSignUp(!isSignUp)}
+                      className="text-sm text-green-600 hover:text-green-700"
+                    >
+                      {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
+                    </button>
+                  </div>
                 </CardContent>
               </Card>
             </form>
