@@ -67,7 +67,7 @@ export default function DashboardPage() {
     } else if (schoolsData) {
       // Fetch items for each school to calculate total value and count
       const schoolsWithAggregates = await Promise.all(schoolsData.map(async (school) => {
-        const { data: itemsData, error: itemsError, count } = await supabase
+        const { data: itemsData, count } = await supabase
           .from('items')
           .select('estimated_value, quantity', { count: 'exact' })
           .eq('school_id', school.id);
@@ -124,7 +124,7 @@ export default function DashboardPage() {
     const link = `${window.location.origin}/admin/${adminKey}`;
     navigator.clipboard.writeText(link)
       .then(() => toast.success("Admin link copied to clipboard!"))
-      .catch(err => toast.error("Failed to copy link."));
+      .catch(() => toast.error("Failed to copy link."));
   };
 
   const handleDeleteSchool = async (schoolId: string, schoolName: string) => {
