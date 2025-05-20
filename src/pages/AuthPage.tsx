@@ -1,141 +1,114 @@
-import { supabase } from '@/lib/supabaseClient';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { useState } from 'react';
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mail, Lock } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
 
-const AuthPage = () => {
+export default function AuthPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    companyName: ''
-  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      if (isSignUp) {
-        // Sign up and sign in
-        const { data: { user }, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password
-        });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-        if (signUpError) throw signUpError;
-        if (!user) throw new Error("Failed to create account");
-
-        // Create insurance company record
-        const { error: dbError } = await supabase
-          .from('insurance_companies')
-          .insert([{
-            id: user.id,
-            email: formData.email,
-            company_name: formData.companyName,
-            password_hash: 'managed_by_supabase_auth'
-          }]);
-
-        if (dbError) {
-          console.error("Failed to create company profile:", dbError);
-          await supabase.auth.signOut();
-          throw new Error("Failed to create company profile");
-        }
-
-        toast.success('Account created successfully!');
-      } else {
-        // Simple sign in
-        const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password
-        });
-
-        if (error) throw error;
-        toast.success('Signed in successfully!');
-      }
-    } catch (error) {
-      console.error("Auth error:", error);
-      toast.error(error instanceof Error ? error.message : 'Authentication failed');
-    } finally {
-      setLoading(false);
+    if (error) {
+      toast.error('Error signing in', {
+        description: error.message,
+      });
+    } else {
+      toast.success('Signed in successfully!');
     }
+
+    setLoading(false);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] p-4">
-      <Card className="w-full max-w-sm p-8 space-y-6">
-        <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold">Insurance Assessor Portal</h2>
-          <p className="text-muted-foreground">
-            {isSignUp ? 'Create a new account' : 'Sign in to your account'}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="name@company.com"
-              value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-              required
-            />
-          </div>
-
-          {isSignUp && (
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input
-                id="companyName"
-                type="text"
-                placeholder="Insurance Co. Ltd."
-                value={formData.companyName}
-                onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                required={isSignUp}
-              />
-            </div>
-          )}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </Button>
-        </form>
-
-        <div className="text-center">
-          <Button
-            variant="link"
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-sm text-muted-foreground"
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <div className="container mx-auto flex items-center justify-center p-4 min-h-[calc(100vh-4rem)]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="text-2xl font-bold text-gray-900 text-center mb-2"
           >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </Button>
-        </div>
+            Welcome Back
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="text-gray-500 text-center mb-8"
+          >
+            Sign in to manage your school's insurance claims
+          </motion.p>
 
-        <p className="text-xs text-center text-muted-foreground">
-          By continuing, you agree to our Terms of Service and Privacy Policy.
-        </p>
-      </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+          >
+            <form onSubmit={handleSignIn}>
+              <Card className="border-0 shadow-lg">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="email"
+                        placeholder="you@school.edu"
+                        type="email"
+                        className="pl-10"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="password"
+                        type="password"
+                        className="pl-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-green-600 hover:bg-green-700 mt-6"
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </form>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
-};
-
-export default AuthPage; 
+} 

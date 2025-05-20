@@ -1,22 +1,30 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, ExternalLink, Copy, RefreshCw, Eye, Trash2 } from "lucide-react";
+import {
+  Building2,
+  Plus,
+  PlusCircle,
+  ExternalLink,
+  Copy,
+  Trash2,
+  Eye
+} from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from "sonner"; // Assuming sonner is used for toasts via App.tsx
+import { toast } from "sonner";
 
 interface School {
   id: string;
   name: string;
   city: string;
   admin_access_key: string;
-  total_estimated_value?: number; // Will be calculated
-  item_count?: number; // Will be calculated
+  total_estimated_value?: number;
+  item_count?: number;
 }
 
 interface Item {
@@ -27,18 +35,15 @@ interface Item {
   school_id: string;
 }
 
-const DashboardPage = () => {
+export default function DashboardPage() {
   const [schools, setSchools] = useState<School[]>([]);
-  const [recentFires, setRecentFires] = useState<any[]>([]); // Placeholder for now
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedSchoolItems, setSelectedSchoolItems] = useState<Item[]>([]);
   const [selectedSchoolForItems, setSelectedSchoolForItems] = useState<School | null>(null);
-
   const [newSchoolName, setNewSchoolName] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [loading, setLoading] = useState(false);
   const [addingSchool, setAddingSchool] = useState(false);
-  const [currentTab, setCurrentTab] = useState("schools");
 
   useEffect(() => {
     fetchSchoolsAndItems();
@@ -81,8 +86,7 @@ const DashboardPage = () => {
       setSchools(schoolsWithAggregates);
     }
 
-    // Fetch all items for the "Assets" tab (could be paginated in a real app)
-    // This fetches items only for schools managed by the current insurance company
+    // Fetch all items
     if (schoolsData && schoolsData.length > 0) {
       const schoolIds = schoolsData.map(s => s.id);
       const { data: allItemsData, error: allItemsError } = await supabase
@@ -113,7 +117,7 @@ const DashboardPage = () => {
       return;
     }
 
-    const adminKey = uuidv4(); // Generate a unique key for admin access
+    const adminKey = uuidv4();
     const { data, error } = await supabase
       .from('schools')
       .insert([{ 
@@ -129,12 +133,11 @@ const DashboardPage = () => {
       toast.error("Failed to add school: " + error.message);
     } else if (data) {
       toast.success(`School '${newSchoolName}' added successfully!`);
-      // @ts-ignore
-      const newSchoolEntry: School = { ...data[0], total_estimated_value: 0, item_count: 0 }; // Add with initial aggregates
+      const newSchoolEntry: School = { ...data[0], total_estimated_value: 0, item_count: 0 };
       setSchools([...schools, newSchoolEntry]);
       setNewSchoolName('');
       setNewSchoolCity('');
-      document.getElementById('close-add-school-dialog')?.click(); // Close dialog
+      document.getElementById('close-add-school-dialog')?.click();
     }
     setAddingSchool(false);
   };
@@ -151,13 +154,12 @@ const DashboardPage = () => {
       return;
     }
     setLoading(true);
-    // Supabase is set to cascade delete items when a school is deleted.
     const { error } = await supabase.from('schools').delete().match({ id: schoolId });
     if (error) {
       toast.error(`Failed to delete school: ${error.message}`);
     } else {
       toast.success(`School ${schoolName} deleted successfully.`);
-      fetchSchoolsAndItems(); // Refresh list
+      fetchSchoolsAndItems();
     }
     setLoading(false);
   };
@@ -179,179 +181,201 @@ const DashboardPage = () => {
     setLoading(false);
   };
 
-  if (loading && schools.length === 0 && allItems.length === 0) {
-    return <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">Loading dashboard data...</div>;
-  }
+  const handleDeleteItem = async (itemId: string, itemName: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`)) {
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.from('items').delete().match({ id: itemId });
+    if (error) {
+      toast.error(`Failed to delete item: ${error.message}`);
+    } else {
+      toast.success(`Item "${itemName}" deleted successfully.`);
+      setSelectedSchoolItems(prev => prev.filter(item => item.id !== itemId));
+      setAllItems(prev => prev.filter(item => item.id !== itemId));
+      fetchSchoolsAndItems();
+    }
+    setLoading(false);
+  };
 
   return (
-    <div className="p-2 md:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-primary">Insurance Dashboard</h1>
-        <Button onClick={fetchSchoolsAndItems} variant="outline" size="sm" disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
-        </Button>
-      </div>
-
-      <Tabs defaultValue="schools" className="w-full" onValueChange={setCurrentTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-4">
-          <TabsTrigger value="schools">Schools</TabsTrigger>
-          {/* <TabsTrigger value="recent_fires">Recent Fires</TabsTrigger> */}
-          <TabsTrigger value="assets">All Assets</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="schools">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Registered Schools</CardTitle>
-                <CardDescription>Manage schools you insure and their assessment links.</CardDescription>
-              </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add School</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New School</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="school-name" className="text-right">Name</Label>
-                      <Input id="school-name" value={newSchoolName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSchoolName(e.target.value)} className="col-span-3" placeholder="e.g., Springfield Elementary" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="school-city" className="text-right">City</Label>
-                      <Input id="school-city" value={newSchoolCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSchoolCity(e.target.value)} className="col-span-3" placeholder="e.g., Springfield" />
-                    </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Schools Dashboard</h1>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add School
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New School</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">School Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter school name"
+                      value={newSchoolName}
+                      onChange={(e) => setNewSchoolName(e.target.value)}
+                    />
                   </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                       <Button type="button" variant="outline" id="close-add-school-dialog">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" onClick={handleAddSchool} disabled={addingSchool}>
-                      {addingSchool ? 'Adding...' : 'Add School'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              {schools.length === 0 && !loading && <p>No schools registered yet. Click "Add School" to begin.</p>}
-              {loading && schools.length === 0 && <p>Loading schools...</p>}
-              <div className="space-y-4">
-                {schools.map((school) => (
-                  <Card key={school.id} className="overflow-hidden">
-                    <CardHeader className="flex flex-row items-start justify-between p-4 bg-muted/30">
-                        <div>
-                            <CardTitle className="text-lg">{school.name}</CardTitle>
-                            <CardDescription>{school.city}</CardDescription>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteSchool(school.id, school.name)} className="text-destructive hover:text-destructive/80">
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Admin Link: 
-                        <Button variant="link" size="sm" onClick={() => handleCopyLink(school.admin_access_key)} className="p-1 h-auto">
-                           <Copy className="mr-1 h-3 w-3" /> Copy Link
-                        </Button>
-                        <a href={`/admin/${school.admin_access_key}`} target="_blank" rel="noopener noreferrer" className="ml-1">
-                          <Button variant="link" size="sm" className="p-1 h-auto">
-                            <ExternalLink className="mr-1 h-3 w-3" /> Open Link
-                          </Button>
-                        </a>
-                      </p>
-                      <p className="text-sm">Total Estimated Value: <span className="font-semibold">${school.total_estimated_value?.toLocaleString() || '0'}</span></p>
-                      <p className="text-sm">Total Items Scanned: <span className="font-semibold">{school.item_count || 0}</span></p>
-                       <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => fetchItemsForSchool(school)} className="mt-2">
-                            <Eye className="mr-2 h-4 w-4" /> View Items ({school.item_count || 0})
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Items for {selectedSchoolForItems?.name}</DialogTitle>
-                          </DialogHeader>
-                          {selectedSchoolItems.length === 0 && <p className="py-4 text-muted-foreground">No items scanned for this school yet.</p>}
-                          <ul className="divide-y divide-border mt-4">
-                            {selectedSchoolItems.map(item => (
-                              <li key={item.id} className="py-3 flex justify-between items-center">
-                                <div>
-                                  <p className="font-medium">{item.name}</p>
-                                  <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
-                                </div>
-                                <p className="text-lg font-semibold text-primary">${item.estimated_value.toLocaleString()}</p>
-                              </li>
-                            ))}
-                          </ul>
-                        </DialogContent>
-                      </Dialog>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* <TabsContent value="recent_fires">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Fires / Claims</CardTitle>
-              <CardDescription>Overview of recent incidents and claims status.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Feature coming soon. This section will display information about recent wildfire incidents affecting insured schools and the status of related claims.</p>
-            </CardContent>
-          </Card>
-        </TabsContent> */}
-
-        <TabsContent value="assets">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Scanned Assets</CardTitle>
-              <CardDescription>An itemized list of all assets across all your insured schools.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {allItems.length === 0 && !loading && <p>No assets found across your schools.</p>}
-              {loading && allItems.length === 0 && <p>Loading assets...</p>}
-              {allItems.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Item Name</th>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">School</th>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Quantity</th>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Est. Value</th>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-background divide-y divide-border">
-                      {allItems.map((item) => {
-                        const school = schools.find(s => s.id === item.school_id);
-                        return (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">{item.name}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{school?.name || 'Unknown School'}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">{item.quantity}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">${item.estimated_value.toLocaleString()}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-primary">${(item.estimated_value * item.quantity).toLocaleString()}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="Enter city"
+                      value={newSchoolCity}
+                      onChange={(e) => setNewSchoolCity(e.target.value)}
+                    />
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    onClick={handleAddSchool}
+                    disabled={addingSchool}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {addingSchool ? 'Adding...' : 'Add School'}
+                  </Button>
+                  <DialogClose id="close-add-school-dialog" />
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {schools.map((school) => (
+              <motion.div
+                key={school.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <Building2 className="h-5 w-5 text-green-600 mr-2" />
+                        {school.name}
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyLink(school.admin_access_key)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSchool(school.id, school.name)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </CardTitle>
+                    <CardDescription>{school.city}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">Total Value</span>
+                        <span className="font-semibold">
+                          ${school.total_estimated_value?.toLocaleString() || '0'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">Items</span>
+                        <span className="font-semibold">{school.item_count || 0}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 mt-2">
+                        <a
+                          href={`${window.location.origin}/admin/${school.admin_access_key}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Admin Link
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyLink(school.admin_access_key)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full mt-4"
+                        onClick={() => fetchItemsForSchool(school)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Items
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {selectedSchoolForItems && (
+            <Dialog open={!!selectedSchoolForItems} onOpenChange={() => setSelectedSchoolForItems(null)}>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    Items for {selectedSchoolForItems.name}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="mt-4">
+                  {selectedSchoolItems.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedSchoolItems.map((item) => (
+                        <Card key={item.id}>
+                          <CardContent className="flex justify-between items-center p-4">
+                            <div>
+                              <h4 className="font-semibold">{item.name}</h4>
+                              <p className="text-sm text-gray-500">
+                                Quantity: {item.quantity} | Value: ${item.estimated_value.toLocaleString()}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteItem(item.id, item.name)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">
+                      No items found for this school.
+                    </p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </motion.div>
+      </div>
     </div>
   );
-};
-
-export default DashboardPage; 
+} 

@@ -19,9 +19,9 @@ interface School {
 interface ScannedItem {
   id?: string;
   name: string;
-  estimatedValue: number;
+  estimated_value: number;
   quantity: number;
-  imageUrl?: string;
+  image_url?: string;
   school_id: string;
 }
 
@@ -50,8 +50,6 @@ const AdminPage = () => {
 
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number>(0);
-  const [showDot, setShowDot] = useState<boolean>(false);
-  const [dotPosition, setDotPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Request camera permission on mount
   useEffect(() => {
@@ -98,15 +96,16 @@ const AdminPage = () => {
   const fetchScannedItemsToday = async (schoolId: string) => {
     const {data, error} = await supabase
       .from('items')
-      .select('id, name, estimated_value, quantity')
+      .select('id, name, estimated_value, quantity, image_url')
       .eq('school_id', schoolId)
       .order('created_at', {ascending: false}); 
     if (data) {
       setScannedItemsToday(data.map(d => ({ 
         id: d.id, 
         name: d.name, 
-        estimatedValue: d.estimated_value,
-        quantity: d.quantity, 
+        estimated_value: d.estimated_value,
+        quantity: d.quantity,
+        image_url: d.image_url,
         school_id: schoolId 
       } as ScannedItem)));
     }
@@ -142,16 +141,12 @@ const AdminPage = () => {
         ...result.detectedObjects
       ]);
       setSelectedObjectIndex(0);
-      setShowDot(true);
-      // Set initial dot position to center of image
-      setDotPosition({ x: 50, y: 50 }); // Percentage values
       toast.success(`Items detected: ${result.itemName} and ${result.detectedObjects.length} other objects`, { icon: <CheckCircle /> });
     } catch (error) {
       console.error("Error during Groq inference:", error);
       toast.error("Could not identify item. Please try again.", { icon: <AlertTriangle /> });
       setInferenceResult(null);
       setDetectedObjects([]);
-      setShowDot(false);
     } finally {
       setIsInferring(false);
     }
@@ -164,11 +159,6 @@ const AdminPage = () => {
       itemName: object.name,
       estimatedValue: object.estimatedValue
     });
-    // Animate dot position change
-    setDotPosition({ 
-      x: 30 + Math.random() * 40, // Random position between 30-70%
-      y: 30 + Math.random() * 40
-    });
   };
 
   const handleSaveItem = async () => {
@@ -178,25 +168,38 @@ const AdminPage = () => {
     }
     setIsSaving(true);
     toast.info("Saving item...", { icon: <Loader2 className="animate-spin" /> });
-    const newItem: ScannedItem = {
-      name: inferenceResult.itemName,
-      estimatedValue: inferenceResult.estimatedValue,
-      quantity: quantity,
-      // imageUrl: capturedImage, // Consider if storing base64 image is too large, or upload to Supabase Storage
-      school_id: school.id,
-    };
 
-    const { data, error } = await supabase.from('items').insert(newItem).select();
+    try {
+      // Convert the captured image to a more efficient format if needed
+      const compressedImage = capturedImage; // You might want to add image compression here
 
-    if (error) {
-      console.error("Error saving item:", error);
-      toast.error(`Failed to save item: ${error.message}`);
-    } else if (data) {
-      toast.success(`${inferenceResult.itemName} (x${quantity}) saved successfully!`);
-      setScannedItemsToday(prevItems => [{ ...newItem, id: data[0].id }, ...prevItems]);
-      handleNextItem(); // Clear for next scan
+      const newItem = {
+        name: inferenceResult.itemName,
+        estimated_value: inferenceResult.estimatedValue,
+        quantity: quantity,
+        image_url: compressedImage,
+        school_id: school.id,
+      };
+
+      const { data, error } = await supabase
+        .from('items')
+        .insert(newItem)
+        .select('id, name, estimated_value, quantity, image_url, school_id');
+
+      if (error) {
+        console.error("Error saving item:", error);
+        toast.error(`Failed to save item: ${error.message}`);
+      } else if (data) {
+        toast.success(`${inferenceResult.itemName} (x${quantity}) saved successfully!`);
+        setScannedItemsToday(prevItems => [data[0], ...prevItems]);
+        handleNextItem(); // Clear for next scan
+      }
+    } catch (err) {
+      console.error("Error in handleSaveItem:", err);
+      toast.error("Failed to save item. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleNextItem = () => {
@@ -234,7 +237,7 @@ const AdminPage = () => {
   }
   
   if (showSummary) {
-    const totalValue = scannedItemsToday.reduce((sum, item) => sum + item.estimatedValue * item.quantity, 0);
+    const totalValue = scannedItemsToday.reduce((sum, item) => sum + item.estimated_value * item.quantity, 0);
     return (
       <div className="p-4 md:p-8 max-w-2xl mx-auto">
         <Card>
@@ -251,9 +254,9 @@ const AdminPage = () => {
                   <li key={item.id || index} className="py-3 flex justify-between items-center">
                     <div>
                       <p className="font-medium">{item.name} (x{item.quantity})</p>
-                      <p className="text-sm text-primary">Value: ${item.estimatedValue.toLocaleString()} each</p>
+                      <p className="text-sm text-primary">Value: ${item.estimated_value.toLocaleString()} each</p>
                     </div>
-                    <p className="text-lg font-semibold">Total: ${(item.estimatedValue * item.quantity).toLocaleString()}</p>
+                    <p className="text-lg font-semibold">Total: ${(item.estimated_value * item.quantity).toLocaleString()}</p>
                   </li>
                 ))}
               </ul>
@@ -302,16 +305,6 @@ const AdminPage = () => {
             ) : (
               <div className="relative">
                 <img src={capturedImage} alt="Captured item" className="w-full h-auto rounded-md aspect-video object-cover" />
-                {showDot && (
-                  <div 
-                    className="absolute w-4 h-4 bg-primary rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
-                    style={{ 
-                      left: `${dotPosition.x}%`, 
-                      top: `${dotPosition.y}%`,
-                      transition: 'all 0.3s ease-in-out'
-                    }}
-                  />
-                )}
               </div>
             )}
           </div>
@@ -373,7 +366,6 @@ const AdminPage = () => {
               setCapturedImage(null); 
               setInferenceResult(null);
               setDetectedObjects([]);
-              setShowDot(false);
             }} variant="outline" disabled={isSaving || isInferring}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Retake
             </Button>
