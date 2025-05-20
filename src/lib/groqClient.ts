@@ -19,7 +19,7 @@ interface GroqInferenceResult {
 const GROQ_API_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 /**
- * Performs image inference using Groq's Llama-4-Maverick model.
+ * Performs image inference using Groq's Llama-4-Maverick model which directly supports vision capabilities.
  * Sends the image data to Groq API and processes the response.
  */
 export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInferenceResult> => {
@@ -37,13 +37,10 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
   }
 
   try {
-    // Convert base64 image to text description for Llama model
-    const imageDescription = await getImageDescription(imageDataUrl);
-
     // Prepare the prompt for object detection and valuation
     const systemPrompt = `You are an expert in identifying and valuing school assets. 
-    When given a description of an image, identify the main item and estimate its value based on current market prices. 
-    Also identify any other relevant items in the image. 
+    When shown an image, identify the main item and estimate its value based on current market prices. 
+    Also detect any other relevant items in the image. 
     Format your response as a JSON object with the following structure:
     {
       "mainItem": {
@@ -67,6 +64,7 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
       },
       body: JSON.stringify({
         model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
@@ -74,7 +72,18 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
           },
           {
             role: "user",
-            content: `Please identify and value the main item in this image, along with any other relevant items you can detect. Here's the image description: ${imageDescription}`
+            content: [
+              {
+                type: "text",
+                text: "Please identify and value the main item in this image, along with any other relevant items you can detect."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageDataUrl
+                }
+              }
+            ]
           }
         ],
         temperature: 0.2, // Lower temperature for more consistent valuations
