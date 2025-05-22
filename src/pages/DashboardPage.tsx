@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
   const ensureUserProfileExists = async (userId: string, userEmail?: string) => {
     try {
-      const { data: profileData, error: profileError } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles') // Assuming 'profiles' table
         .select('id')
         .eq('id', userId)
