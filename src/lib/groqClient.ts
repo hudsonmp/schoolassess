@@ -4,6 +4,8 @@ const VITE_GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 if (!VITE_GROQ_API_KEY) {
   console.warn("Groq API Key (VITE_GROQ_API_KEY) is missing for client-side use. Mock data will be used.");
+} else {
+  console.log("Groq API Key found:", VITE_GROQ_API_KEY ? `${VITE_GROQ_API_KEY.substring(0, 10)}...` : 'undefined');
 }
 
 interface GroqInferenceResult {
@@ -23,7 +25,7 @@ const INITIAL_RETRY_DELAY = 1000; // 1 second
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Performs image inference using Groq's Llama-4-Maverick model which directly supports vision capabilities.
+ * Performs image inference using Groq's Llava vision model.
  * Sends the image data to Groq API and processes the response.
  */
 export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInferenceResult> => {
@@ -71,6 +73,8 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
       }`;
 
       console.log(`Calling Groq API (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+      console.log(`Using API key: ${VITE_GROQ_API_KEY ? `${VITE_GROQ_API_KEY.substring(0, 10)}...` : 'undefined'}`);
+      
       const response = await fetch(GROQ_API_ENDPOINT, {
         method: "POST",
         headers: {
@@ -78,7 +82,7 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+          model: "llava-v1.5-7b-4096-preview", // Fixed: Using correct vision model
           response_format: { type: "json_object" },
           messages: [
             {
@@ -114,6 +118,11 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
           error: errorData
         });
 
+        // If it's a 401 error, provide specific guidance
+        if (response.status === 401) {
+          throw new Error(`Groq API authentication failed. Please check your API key. Error: ${errorData.error?.message || 'Unauthorized'}`);
+        }
+
         // If it's a 503 error or other server error, throw to trigger retry
         if (response.status >= 500) {
           throw new Error(`Groq API server error (${response.status}): ${errorData.error?.message || 'Service temporarily unavailable'}`);
@@ -146,6 +155,11 @@ export const inferImageWithGroq = async (imageDataUrl: string): Promise<GroqInfe
     } catch (error) {
       console.error(`Error during Groq inference (attempt ${attempt + 1}/${MAX_RETRIES}):`, error);
       lastError = error as Error;
+      
+      // If it's a 401 error, don't retry
+      if (error instanceof Error && error.message.includes('authentication failed')) {
+        throw error;
+      }
       
       // If it's not a server error (not 5xx), don't retry
       if (error instanceof Error && !error.message.includes('server error')) {

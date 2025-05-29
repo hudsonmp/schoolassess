@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { supabase } from '@/lib/supabaseClient';
 import { inferImageWithGroq } from '@/lib/groqClient';
+import { debugEnvironment } from '@/lib/debugEnv';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,9 @@ const AdminPage = () => {
 
   // Request camera permission on mount
   useEffect(() => {
+    // Debug environment variables on component mount
+    debugEnvironment();
+    
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(() => {
         console.log("Camera permission granted");
