@@ -46,44 +46,6 @@ export default function DashboardPage() {
     fetchSchoolsAndItems();
   }, []);
 
-  const ensureUserProfileExists = async (userId: string, userEmail?: string) => {
-    try {
-      const { error: profileError } = await supabase
-        .from('profiles') // Assuming 'profiles' table
-        .select('id')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) {
-        if (profileError.code === 'PGRST116') { // PGRST116: "Searched item was not found"
-          // Profile does not exist, create it
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert([{ id: userId, email: userEmail }]) // Add other necessary default fields if any
-            .select();
-          
-          if (insertError) {
-            console.error("Error creating profile:", insertError);
-            toast.error("Failed to automatically create user profile: " + insertError.message);
-            throw insertError; 
-          } else {
-            toast.info("User profile created automatically.");
-          }
-        } else {
-          // Another error occurred while fetching profile
-          console.error("Error checking profile:", profileError);
-          toast.error("Failed to check user profile: " + profileError.message);
-          throw profileError;
-        }
-      }
-      // Profile exists or was successfully created
-    } catch (error) {
-      // Rethrow or handle as appropriate for your app's error handling strategy
-      console.error("EnsureUserProfileExists failed:", error);
-      throw error;
-    }
-  };
-
   const fetchSchoolsAndItems = async () => {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
@@ -93,18 +55,8 @@ export default function DashboardPage() {
       return;
     }
     const userId = sessionData.session.user.id;
-    const userEmail = sessionData.session.user.email;
 
-    try {
-      // Ensure user profile exists before proceeding
-      await ensureUserProfileExists(userId, userEmail);
-    } catch (profileError) {
-      // If profile check/creation fails, stop further execution
-      // The error is already toasted by ensureUserProfileExists
-      return;
-    }
-
-    // Fetch schools
+    // Fetch schools - no need for profiles table
     const { data: schoolsData, error: schoolsError } = await supabase
       .from('schools')
       .select('id, name, city, admin_access_key')
