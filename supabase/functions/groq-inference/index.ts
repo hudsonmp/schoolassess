@@ -15,17 +15,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log('Groq inference function started');
+    
     // Get the Groq API key from environment variables (server-side)
     const groqApiKey = Deno.env.get('GROQ_API_KEY');
     if (!groqApiKey) {
+      console.error('GROQ_API_KEY environment variable is not set');
       throw new Error('GROQ_API_KEY environment variable is not set');
     }
+    console.log('Groq API key found');
 
     // Parse the request body
     const { imageDataUrl } = await req.json();
     if (!imageDataUrl) {
+      console.error('Missing imageDataUrl in request body');
       throw new Error('Missing imageDataUrl in request body');
     }
+    console.log('Image data URL received');
 
     // Prepare the prompt for object detection and valuation
     const systemPrompt = `You are an expert in identifying and valuing school assets. 
@@ -46,7 +52,8 @@ Deno.serve(async (req: Request) => {
       ]
     }`;
 
-    // Make the request to Groq API
+    // Make the request to Groq API with updated model
+    console.log('Making request to Groq API');
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -54,7 +61,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+        model: "llama-3.2-11b-vision-preview",
         response_format: { type: "json_object" },
         messages: [
           {
@@ -82,13 +89,23 @@ Deno.serve(async (req: Request) => {
       })
     });
 
+    console.log('Groq API response status:', response.status);
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Groq API error:', errorData);
-      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
+      const errorText = await response.text();
+      console.error('Groq API error response:', errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      throw new Error(`Groq API error (${response.status}): ${errorData.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Groq API response received successfully');
+    
     const content = data.choices[0].message.content;
     
     // Parse the JSON response from the model
@@ -97,6 +114,7 @@ Deno.serve(async (req: Request) => {
       parsedContent = JSON.parse(content);
     } catch (e) {
       console.error("Failed to parse model response:", e);
+      console.error("Raw content:", content);
       throw new Error("Invalid response format from model");
     }
 
@@ -106,6 +124,7 @@ Deno.serve(async (req: Request) => {
       detectedObjects: parsedContent.otherObjects || []
     };
 
+    console.log('Successfully processed request');
     return new Response(JSON.stringify(result), {
       headers: { 
         ...corsHeaders,
