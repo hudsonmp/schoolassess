@@ -18,20 +18,29 @@ Deno.serve(async (req: Request) => {
     console.log('Groq inference function started');
     
     // Get the Groq API key from environment variables (server-side)
-    const groqApiKey = Deno.env.get('GROQ_API_KEY');
+    const groqApiKey = Deno.env.get('GROQ_API_KEY') || Deno.env.get('VITE_GROQ_API_KEY');
     if (!groqApiKey) {
-      console.error('GROQ_API_KEY environment variable is not set');
-      throw new Error('GROQ_API_KEY environment variable is not set');
+      console.error('GROQ_API_KEY or VITE_GROQ_API_KEY environment variable is not set');
+      console.error('Available env vars:', Object.keys(Deno.env.toObject()));
+      throw new Error('GROQ_API_KEY or VITE_GROQ_API_KEY environment variable is not set');
     }
-    console.log('Groq API key found');
+    console.log('Groq API key found:', groqApiKey.substring(0, 10) + '...');
 
     // Parse the request body
-    const { imageDataUrl } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (e) {
+      console.error('Failed to parse request body:', e);
+      throw new Error('Invalid JSON in request body');
+    }
+
+    const { imageDataUrl } = requestBody;
     if (!imageDataUrl) {
       console.error('Missing imageDataUrl in request body');
       throw new Error('Missing imageDataUrl in request body');
     }
-    console.log('Image data URL received');
+    console.log('Image data URL received, length:', imageDataUrl.length);
 
     // Prepare the prompt for object detection and valuation
     const systemPrompt = `You are an expert in identifying and valuing school assets. 
@@ -52,8 +61,8 @@ Deno.serve(async (req: Request) => {
       ]
     }`;
 
-    // Make the request to Groq API with updated model
-    console.log('Making request to Groq API');
+    // Make the request to Groq API with llama-4 model
+    console.log('Making request to Groq API with llama-4 model');
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -61,7 +70,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.2-11b-vision-preview",
+        model: "meta-llama/llama-4-scout-17b-16e-instruct",
         response_format: { type: "json_object" },
         messages: [
           {
@@ -105,6 +114,7 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
     console.log('Groq API response received successfully');
+    console.log('Response data:', JSON.stringify(data, null, 2));
     
     const content = data.choices[0].message.content;
     
@@ -124,7 +134,7 @@ Deno.serve(async (req: Request) => {
       detectedObjects: parsedContent.otherObjects || []
     };
 
-    console.log('Successfully processed request');
+    console.log('Successfully processed request, result:', JSON.stringify(result, null, 2));
     return new Response(JSON.stringify(result), {
       headers: { 
         ...corsHeaders,
@@ -134,9 +144,11 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in groq-inference function:', error);
+    console.error('Error stack:', error.stack);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Internal server error' 
+        error: error.message || 'Internal server error',
+        details: error.stack || 'No stack trace available'
       }), 
       { 
         status: 500,
